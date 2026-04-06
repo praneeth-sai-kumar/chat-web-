@@ -7,7 +7,7 @@ const Login = ({ setUser }) => {
   const handleLogin = async () => {
     if (!username) return;
 
-    await axios.post("http://localhost:5000/api/users/register", {
+    await axios.post("https://chat-web-ihak.onrender.com/api/users/register", {
       username,
     });
 

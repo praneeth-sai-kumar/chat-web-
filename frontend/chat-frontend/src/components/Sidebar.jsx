@@ -7,7 +7,9 @@ const Sidebar = ({ currentUser, selectedUser, setSelectedUser }) => {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const res = await axios.get("http://localhost:5000/api/users");
+      const res = await axios.get(
+        "https://chat-web-ihak.onrender.com/api/users",
+      );
       setUsers(res.data);
     };
 

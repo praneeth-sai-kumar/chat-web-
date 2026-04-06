@@ -4,7 +4,7 @@ import io from "socket.io-client";
 import Sidebar from "./Sidebar";
 import Message from "./Message";
 
-const socket = io("http://localhost:5000");
+const socket = io("https://chat-web-ihak.onrender.com/");
 
 const Chat = ({ user }) => {
   const [selectedUser, setSelectedUser] = useState("");
@@ -20,7 +20,7 @@ const Chat = ({ user }) => {
 
     const fetchMessages = async () => {
       const res = await axios.get(
-        `http://localhost:5000/api/messages?user1=${user}&user2=${selectedUser}`,
+        `https://chat-web-ihak.onrender.com//api/messages?user1=${user}&user2=${selectedUser}`,
       );
       setMessages(res.data);
     };
