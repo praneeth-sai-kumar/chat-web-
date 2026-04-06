@@ -5,7 +5,7 @@ const setupSocket = (io) => {
   io.on("connection", (socket) => {
     console.log("User connected:", socket.id);
 
-    // ✅ Register
+    // ✅ Register user
     socket.on("register", async (username) => {
       await User.findOneAndUpdate(
         { username },
@@ -26,17 +26,19 @@ const setupSocket = (io) => {
           isDelivered: receiverUser?.isOnline || false,
         });
 
+        // send to receiver
         if (receiverUser?.socketId) {
           io.to(receiverUser.socketId).emit("receiveMessage", message);
         }
 
+        // send back to sender
         socket.emit("receiveMessage", message);
       } catch (err) {
         console.error(err);
       }
     });
 
-    // ✅ DELETE MESSAGE
+    // ✅ Delete message
     socket.on("deleteMessage", async ({ messageId, type, username }) => {
       try {
         const message = await Message.findById(messageId);
@@ -68,7 +70,7 @@ const setupSocket = (io) => {
       }
     });
 
-    // ✅ PIN MESSAGE
+    // ✅ Pin message
     socket.on("pinMessage", async (messageId) => {
       try {
         const message = await Message.findById(messageId);
