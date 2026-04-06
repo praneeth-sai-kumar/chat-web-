@@ -1,0 +1,140 @@
+import { useEffect, useState } from "react";
+import axios from "axios";
+import io from "socket.io-client";
+import Sidebar from "./Sidebar";
+import Message from "./Message";
+
+const socket = io("http://localhost:5000");
+
+const Chat = ({ user }) => {
+  const [selectedUser, setSelectedUser] = useState("");
+  const [messages, setMessages] = useState([]);
+  const [input, setInput] = useState("");
+
+  useEffect(() => {
+    socket.emit("register", user);
+  }, [user]);
+
+  useEffect(() => {
+    if (!selectedUser) return;
+
+    const fetchMessages = async () => {
+      const res = await axios.get(
+        `http://localhost:5000/api/messages?user1=${user}&user2=${selectedUser}`,
+      );
+      setMessages(res.data);
+    };
+
+    fetchMessages();
+  }, [selectedUser, user]);
+
+  useEffect(() => {
+    const handleMessage = (msg) => {
+      if (
+        (msg.sender === user && msg.receiver === selectedUser) ||
+        (msg.sender === selectedUser && msg.receiver === user)
+      ) {
+        setMessages((prev) => {
+          const exists = prev.find((m) => m._id === msg._id);
+          if (exists) return prev;
+          return [...prev, msg];
+        });
+      }
+    };
+
+    socket.on("receiveMessage", handleMessage);
+
+    socket.on("messageDeleted", (msg) => {
+      setMessages((prev) => prev.map((m) => (m._id === msg._id ? msg : m)));
+    });
+
+    socket.on("messagePinned", (msg) => {
+      setMessages((prev) => prev.map((m) => (m._id === msg._id ? msg : m)));
+    });
+
+    return () => {
+      socket.off("receiveMessage", handleMessage);
+      socket.off("messageDeleted");
+      socket.off("messagePinned");
+    };
+  }, [selectedUser, user]);
+
+  const sendMessage = () => {
+    if (!input || !selectedUser) return;
+
+    socket.emit("sendMessage", {
+      sender: user,
+      receiver: selectedUser,
+      content: input,
+    });
+
+    setInput("");
+  };
+
+  return (
+    <div style={{ display: "flex", height: "100vh" }}>
+      <Sidebar
+        currentUser={user}
+        selectedUser={selectedUser}
+        setSelectedUser={setSelectedUser}
+      />
+
+      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
+        <div
+          style={{
+            padding: "12px",
+            background: "#7C3AED",
+            color: "white",
+            fontWeight: "bold",
+          }}
+        >
+          {selectedUser || "Select a user"}
+        </div>
+
+        <div
+          style={{
+            flex: 1,
+            padding: "10px",
+            overflowY: "auto",
+            background: "#f3f4f6",
+          }}
+        >
+          {messages.map((msg) => (
+            <Message key={msg._id} msg={msg} currentUser={user} />
+          ))}
+        </div>
+
+        <div style={{ display: "flex", padding: "10px" }}>
+          <input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Type a message..."
+            style={{
+              flex: 1,
+              padding: "10px",
+              borderRadius: "5px",
+              border: "1px solid #ccc",
+            }}
+          />
+
+          <button
+            onClick={sendMessage}
+            style={{
+              marginLeft: "10px",
+              background: "#7C3AED",
+              color: "white",
+              padding: "10px 15px",
+              border: "none",
+              borderRadius: "5px",
+              cursor: "pointer",
+            }}
+          >
+            Send
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Chat;

@@ -1,0 +1,52 @@
+body {
+  margin: 0;
+  font-family: Arial, sans-serif;
+  background: #f3f4f6;
+}
+
+.app {
+  display: flex;
+  height: 100vh;
+}
+
+/* Violet theme */
+.primary {
+  background: #7c3aed;
+  color: white;
+}
+
+.chat-container {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.messages {
+  flex: 1;
+  padding: 10px;
+  overflow-y: auto;
+}
+
+.message {
+  margin: 8px 0;
+  padding: 10px;
+  border-radius: 10px;
+  max-width: 60%;
+}
+
+.sent {
+  background: #7c3aed;
+  color: white;
+  margin-left: auto;
+}
+
+.received {
+  background: #e5e7eb;
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .app {
+    flex-direction: column;
+  }
+}
