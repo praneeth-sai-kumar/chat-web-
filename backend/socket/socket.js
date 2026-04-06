@@ -64,8 +64,17 @@ const setupSocket = (io) => {
 
         await message.save();
 
-        // 🔥 BROADCAST UPDATE
-        io.emit("messageDeleted", message);
+        // 🔥 send only to sender + receiver
+        const senderUser = await User.findOne({ username: message.sender });
+        const receiverUser = await User.findOne({ username: message.receiver });
+
+        if (senderUser?.socketId) {
+          io.to(senderUser.socketId).emit("messageDeleted", message);
+        }
+
+        if (receiverUser?.socketId) {
+          io.to(receiverUser.socketId).emit("messageDeleted", message);
+        }
       } catch (error) {
         console.error("Delete message error:", error);
       }
@@ -79,7 +88,16 @@ const setupSocket = (io) => {
         message.isPinned = !message.isPinned;
         await message.save();
 
-        io.emit("messagePinned", message);
+        const senderUser = await User.findOne({ username: message.sender });
+        const receiverUser = await User.findOne({ username: message.receiver });
+
+        if (senderUser?.socketId) {
+          io.to(senderUser.socketId).emit("messagePinned", message);
+        }
+
+        if (receiverUser?.socketId) {
+          io.to(receiverUser.socketId).emit("messagePinned", message);
+        }
       } catch (error) {
         console.error("Pin message error:", error);
       }
