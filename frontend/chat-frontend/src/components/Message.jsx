@@ -1,4 +1,4 @@
-const Message = ({ msg, currentUser }) => {
+const Message = ({ msg, currentUser, onDelete, onDeleteAll, onPin }) => {
   return (
     <div
       style={{
@@ -11,9 +11,15 @@ const Message = ({ msg, currentUser }) => {
         marginLeft: msg.sender === currentUser ? "auto" : "0",
       }}
     >
-      {msg.isDeletedForEveryone ? "🚫 Message deleted" : msg.content}
+      {msg.isDeletedForEveryone ? "Message deleted" : msg.content}
 
-      {msg.isPinned && <span> 📌</span>}
+      {msg.isPinned && <div>📌 Pinned</div>}
+
+      <div style={{ marginTop: "5px" }}>
+        <button onClick={() => onPin(msg._id)}>Pin</button>
+        <button onClick={() => onDelete(msg._id)}>Delete</button>
+        <button onClick={() => onDeleteAll(msg._id)}>DFE</button>
+      </div>
     </div>
   );
 };

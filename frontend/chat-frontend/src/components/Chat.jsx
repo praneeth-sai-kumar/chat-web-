@@ -1,140 +1,105 @@
-import { useEffect, useState } from "react";
-import axios from "axios";
-import io from "socket.io-client";
-import Sidebar from "./Sidebar";
-import Message from "./Message";
+const User = require("../models/User");
+const Message = require("../models/Message");
 
-const socket = io("https://chat-web-ihak.onrender.com/");
+const setupSocket = (io) => {
+  io.on("connection", (socket) => {
+    console.log("User connected:", socket.id);
 
-const Chat = ({ user }) => {
-  const [selectedUser, setSelectedUser] = useState("");
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-
-  useEffect(() => {
-    socket.emit("register", user);
-  }, [user]);
-
-  useEffect(() => {
-    if (!selectedUser) return;
-
-    const fetchMessages = async () => {
-      const res = await axios.get(
-        `https://chat-web-ihak.onrender.com//api/messages?user1=${user}&user2=${selectedUser}`,
+    // ✅ Register
+    socket.on("register", async (username) => {
+      await User.findOneAndUpdate(
+        { username },
+        { isOnline: true, socketId: socket.id },
+        { upsert: true },
       );
-      setMessages(res.data);
-    };
+    });
 
-    fetchMessages();
-  }, [selectedUser, user]);
+    // ✅ Send message
+    socket.on("sendMessage", async ({ sender, receiver, content }) => {
+      try {
+        const receiverUser = await User.findOne({ username: receiver });
 
-  useEffect(() => {
-    const handleMessage = (msg) => {
-      if (
-        (msg.sender === user && msg.receiver === selectedUser) ||
-        (msg.sender === selectedUser && msg.receiver === user)
-      ) {
-        setMessages((prev) => {
-          const exists = prev.find((m) => m._id === msg._id);
-          if (exists) return prev;
-          return [...prev, msg];
+        const message = await Message.create({
+          sender,
+          receiver,
+          content,
+          isDelivered: receiverUser?.isOnline || false,
         });
+
+        if (receiverUser?.socketId) {
+          io.to(receiverUser.socketId).emit("receiveMessage", message);
+        }
+
+        socket.emit("receiveMessage", message);
+      } catch (err) {
+        console.error(err);
       }
-    };
-
-    socket.on("receiveMessage", handleMessage);
-
-    socket.on("messageDeleted", (msg) => {
-      setMessages((prev) => prev.map((m) => (m._id === msg._id ? msg : m)));
     });
 
-    socket.on("messagePinned", (msg) => {
-      setMessages((prev) => prev.map((m) => (m._id === msg._id ? msg : m)));
+    // ✅ DELETE MESSAGE
+    socket.on("deleteMessage", async ({ messageId, type, username }) => {
+      try {
+        const message = await Message.findById(messageId);
+        if (!message) return;
+
+        if (type === "everyone") {
+          message.isDeletedForEveryone = true;
+          message.content = "Message deleted";
+        } else if (type === "me") {
+          if (!message.deletedFor.includes(username)) {
+            message.deletedFor.push(username);
+          }
+        }
+
+        await message.save();
+
+        const senderUser = await User.findOne({ username: message.sender });
+        const receiverUser = await User.findOne({ username: message.receiver });
+
+        if (senderUser?.socketId) {
+          io.to(senderUser.socketId).emit("messageDeleted", message);
+        }
+
+        if (receiverUser?.socketId) {
+          io.to(receiverUser.socketId).emit("messageDeleted", message);
+        }
+      } catch (err) {
+        console.error(err);
+      }
     });
 
-    return () => {
-      socket.off("receiveMessage", handleMessage);
-      socket.off("messageDeleted");
-      socket.off("messagePinned");
-    };
-  }, [selectedUser, user]);
+    // ✅ PIN MESSAGE
+    socket.on("pinMessage", async (messageId) => {
+      try {
+        const message = await Message.findById(messageId);
+        if (!message) return;
 
-  const sendMessage = () => {
-    if (!input || !selectedUser) return;
+        message.isPinned = !message.isPinned;
+        await message.save();
 
-    socket.emit("sendMessage", {
-      sender: user,
-      receiver: selectedUser,
-      content: input,
+        const senderUser = await User.findOne({ username: message.sender });
+        const receiverUser = await User.findOne({ username: message.receiver });
+
+        if (senderUser?.socketId) {
+          io.to(senderUser.socketId).emit("messagePinned", message);
+        }
+
+        if (receiverUser?.socketId) {
+          io.to(receiverUser.socketId).emit("messagePinned", message);
+        }
+      } catch (err) {
+        console.error(err);
+      }
     });
 
-    setInput("");
-  };
-
-  return (
-    <div style={{ display: "flex", height: "100vh" }}>
-      <Sidebar
-        currentUser={user}
-        selectedUser={selectedUser}
-        setSelectedUser={setSelectedUser}
-      />
-
-      <div style={{ flex: 1, display: "flex", flexDirection: "column" }}>
-        <div
-          style={{
-            padding: "12px",
-            background: "#7C3AED",
-            color: "white",
-            fontWeight: "bold",
-          }}
-        >
-          {selectedUser || "Select a user"}
-        </div>
-
-        <div
-          style={{
-            flex: 1,
-            padding: "10px",
-            overflowY: "auto",
-            background: "#f3f4f6",
-          }}
-        >
-          {messages.map((msg) => (
-            <Message key={msg._id} msg={msg} currentUser={user} />
-          ))}
-        </div>
-
-        <div style={{ display: "flex", padding: "10px" }}>
-          <input
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            placeholder="Type a message..."
-            style={{
-              flex: 1,
-              padding: "10px",
-              borderRadius: "5px",
-              border: "1px solid #ccc",
-            }}
-          />
-
-          <button
-            onClick={sendMessage}
-            style={{
-              marginLeft: "10px",
-              background: "#7C3AED",
-              color: "white",
-              padding: "10px 15px",
-              border: "none",
-              borderRadius: "5px",
-              cursor: "pointer",
-            }}
-          >
-            Send
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+    // ✅ Disconnect
+    socket.on("disconnect", async () => {
+      await User.findOneAndUpdate(
+        { socketId: socket.id },
+        { isOnline: false, socketId: null },
+      );
+    });
+  });
 };
 
-export default Chat;
+module.exports = setupSocket;
